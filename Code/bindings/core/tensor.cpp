@@ -4,7 +4,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "tensor.h"
+#include "activations/activations.h"
+#include "tensor/tensor.h"
 
 namespace py = pybind11;
 
@@ -20,7 +21,7 @@ static Tensor::Shape tuple_to_shape(const py::tuple& t) {
     return indices;
 }
 
-PYBIND11_MODULE(tinytorch, m) {
+void bind_tensor(py::module_& m) {
     m.doc() = "TinyTorch Tensor Library";
 
     py::class_<Tensor>(m, "Tensor")
@@ -36,7 +37,8 @@ PYBIND11_MODULE(tinytorch, m) {
 
         .def_property_readonly("shape", &Tensor::shape)
 
-        .def_property_readonly("data", &Tensor::data)
+        .def_property_readonly(
+            "data", static_cast<const Tensor::Storage& (Tensor::*)() const>(&Tensor::data))
 
         .def_property_readonly("size", &Tensor::size)
 
@@ -76,6 +78,27 @@ PYBIND11_MODULE(tinytorch, m) {
         .def("copy", [](const Tensor& tensor) { return Tensor(tensor); })
 
         .def("tolist", [](const Tensor& tensor) { return tensor.data(); })
+        .def("reshape", &Tensor::reShape)
+        .def("transpose", &Tensor::Transpose)
+        .def("sum", [](const Tensor& tensor) { return tensor.sum(); })
+        .def(
+            "sum", [](const Tensor& tensor, Tensor::size_type axis) { return tensor.sum(axis); },
+            py::arg("axis"))
+        .def("mean", [](const Tensor& tensor) { return tensor.mean(); })
+        .def(
+            "mean", [](const Tensor& tensor, Tensor::size_type axis) { return tensor.mean(axis); },
+            py::arg("axis"))
+        .def("max", &Tensor::max)
+        .def("min", &Tensor::min)
+
+        .def("relu", &Tensor::relu)
+        .def("sigmoid", &Tensor::sigmoid)
+        .def("tanh", &Tensor::tanh)
+        .def("gelu", &Tensor::gelu)
+        .def("softmax", &Tensor::softmax, py::arg("dim") = -1)
+        .def("log_softmax", &Tensor::log_softmax, py::arg("dim") = -1)
+        .def("log", &Tensor::log)
+        .def("clamp", &Tensor::clamp, py::arg("min"), py::arg("max"))
 
         // ================= Comparison =================
 
@@ -108,9 +131,31 @@ PYBIND11_MODULE(tinytorch, m) {
                  return oss.str();
              })
 
-        .def("__str__", [](const Tensor& tensor) {
-            std::ostringstream oss;
-            oss << tensor;
-            return oss.str();
-        });
+        .def("__str__",
+             [](const Tensor& tensor) {
+                 std::ostringstream oss;
+                 oss << tensor;
+                 return oss.str();
+             })
+
+        // Property to get/set requires_grad
+        .def_property("requires_grad", &Tensor::requires_grad, &Tensor::set_requires_grad)
+
+        // Read-only property to get the gradient tensor (returns None if no grad)
+        .def_property_readonly("grad",
+                               [](const Tensor& tensor) -> std::optional<Tensor> {
+                                   if (tensor.grad_) {
+                                       return *tensor.grad_;
+                                   }
+                                   return std::nullopt;
+                               })
+
+        // Backward method
+        .def(
+            "backward",
+            [](Tensor& tensor, std::optional<Tensor> gradient) { tensor.backward(gradient); },
+            py::arg("gradient") = py::none())
+
+        // Zero grad
+        .def("zero_grad", &Tensor::zero_grad);
 }

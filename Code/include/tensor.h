@@ -3,9 +3,12 @@
 #include <cmath>
 #include <cstddef>
 #include <iosfwd>
+#include <memory>
+#include <optional>
 #include <string_view>
 #include <vector>
 
+class Function;
 class Tensor {
   public:
     // Type aliases for convenience
@@ -13,6 +16,10 @@ class Tensor {
     using size_type = std::size_t;
     using Shape = std::vector<size_type>;
     using Storage = std::vector<value_type>;
+
+    // Graph and Gradient Storage (Public for easy access during graph traversal)
+    std::shared_ptr<Function> grad_fn_ = nullptr;
+    std::shared_ptr<Tensor> grad_ = nullptr;
 
     //  ================= Constructors =================
     Tensor() = default; // default constructor
@@ -108,9 +115,22 @@ class Tensor {
     [[nodiscard]] Tensor gelu() const;
     [[nodiscard]] Tensor softmax(int dim = -1) const;
 
+    // Module -> 4
+    // Element-wise math used by the loss module
+    [[nodiscard]] Tensor log() const;
+    [[nodiscard]] Tensor clamp(value_type min_value, value_type max_value) const;
+    [[nodiscard]] Tensor log_softmax(int dim = -1) const;
+    // ================= Autograd Properties =================
+    void set_requires_grad(bool req);
+    [[nodiscard]] bool requires_grad() const noexcept { return requires_grad_; }
+
+    void backward(const std::optional<Tensor>& gradient = std::nullopt);
+    void zero_grad();
+
   private:
     Storage data_;
     Shape shape_;
+    bool requires_grad_ = false;
 
     template <typename BinaryOp>
     [[nodiscard]] Tensor apply_tensor_operation(const Tensor& other, BinaryOp op,

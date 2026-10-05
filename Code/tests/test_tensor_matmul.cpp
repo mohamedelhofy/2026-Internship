@@ -77,8 +77,8 @@ TEST(TensorMatMulTest, OutOfBoundsAccess) {
     // EXPECT_THROW(a(2, 0), std::out_of_range);
 
     // EXPECT_THROW(a(0, 2), std::out_of_range);
-    EXPECT_ANY_THROW(a(Tensor::Shape{2, 0}));
-    EXPECT_ANY_THROW(a(Tensor::Shape{0, 2}));
+    EXPECT_ANY_THROW(void(a(Tensor::Shape{2, 0})));
+    EXPECT_ANY_THROW(void(a(Tensor::Shape{0, 2})));
 }
 // add tests for ND tensors
 TEST(TensorMatMulTest, NDimensionalTensor) {
